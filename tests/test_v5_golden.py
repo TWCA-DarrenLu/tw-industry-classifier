@@ -493,6 +493,23 @@ def test_n3_excludes_representative_office():
     assert verdict_of("測試縣稅捐稽徵處")[0] == "政府機關"
 
 
+def test_n3_suffix_rules_skip_company_internal_units():
+    """公司的內部單位不判政府機關（2026-08-28）。
+
+    N3 的尾字（部／署／局／處／委員會）只看尾字，會把「○○股份有限公司信託部」
+    判成政府機關；名稱含公司或店家後綴時尾字關鍵詞停用，改由後續規則接手。
+    """
+    # 花旗三個分部統編的實際名稱樣式：落 N12 判本國銀行，不再是政府機關
+    for unit in ("信用卡服務部", "營業部", "信託部"):
+        got = verdict_of("測試（台灣）商業銀行股份有限公司" + unit)
+        assert got[:2] == ("金控與銀行", "本國銀行"), unit + "：實得 %s／%s" % got[:2]
+    # 非金融公司的事業部：落回稅籍層（本例稅籍查無 → 未登記），不掛政府機關
+    assert verdict_of("測試糖業股份有限公司量販事業部")[0] != "政府機關"
+    # 對照組：機關全銜關鍵詞不受排除影響，真機關照舊命中
+    assert verdict_of("審計部")[0] == "政府機關"
+    assert verdict_of("測試市政府資訊中心")[0] == "政府機關"
+
+
 def test_a4_prime_low_confidence_accountant():
     """A4′：名稱以「會計」／「會計師」結尾 → 執行業務者，且只在稅籍查無時作用。"""
     rec = engine.query("12345678", FakeProvider(), fallback_name="測試聯合會計")

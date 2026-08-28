@@ -135,11 +135,14 @@ for c2 in sorted(R.SUB_BY_MAJOR2):
         "一般企業", R.SUB_BY_MAJOR2[c2], "medium", "完整覆蓋 01–99，保證不落空")
 for rid, group, sub, kws in R.NAME_RULES:
     excl = R.NAME_RULE_SUFFIX_EXCLUDE.get(rid, ())
+    nexcl = R.NAME_RULE_NAME_EXCLUDE.get(rid, ())
     add("L3-8/%s" % rid, "L3 名稱關鍵字", "官方正式名稱（僅稅籍查無時）", "名稱含",
         "／".join(k.rstrip("$").replace("(股份)?", "") + ("（尾字）" if k.endswith("$") else "")
                  for k in kws),
         group, sub, "medium",
-        "順序即優先序" + ("；排除尾綴 " + "／".join(excl) if excl else ""))
+        "順序即優先序"
+        + ("；排除尾綴 " + "／".join(excl) if excl else "")
+        + ("；名稱含 " + "／".join(nexcl) + " 者不套尾字關鍵詞" if nexcl else ""))
 add("L4", "L4 兜底", "—", "—", "以上全未命中", R.FALLBACK[0], R.FALLBACK[1], "low", R.FALLBACK[2])
 
 # ── 單軌合併（產業大類）──────────────────────────────────────────────────

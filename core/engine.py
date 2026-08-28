@@ -102,7 +102,12 @@ def _match_name_rules(name):
     for rid, group, sub, keywords in R.NAME_RULES:
         if any(name.endswith(s) for s in R.NAME_RULE_SUFFIX_EXCLUDE.get(rid, ())):
             continue                                  # 例：N3 的「處$」不收「○○辦事處」
+        # 名稱含業態詞 → 只停用該規則的尾字關鍵詞，明列的機關全銜關鍵詞照舊比對
+        # （例：N3 的「部$」不收「○○股份有限公司信託部」，但「行政院○○」仍命中）
+        drop_suffix_kw = any(s in name for s in R.NAME_RULE_NAME_EXCLUDE.get(rid, ()))
         for kw in keywords:
+            if drop_suffix_kw and kw.endswith("$"):
+                continue
             hit = re.search(kw, name) if kw.endswith("$") else (kw in name)
             if hit:
                 shown = kw.rstrip("$").replace("(股份)?", "")
