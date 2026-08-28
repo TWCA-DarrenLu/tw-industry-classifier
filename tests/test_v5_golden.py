@@ -942,3 +942,31 @@ def test_real_golden_cases():
         got = (rec["產業大類"], rec["產業子類"])
         assert got == (want_group, want_sub), \
             "%s（%s）：期望 %s／%s，實得 %s／%s" % (tid, why, want_group, want_sub, *got)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 本地端 sqlite 索引的路徑處理
+# ══════════════════════════════════════════════════════════════════════════
+def test_sqlite_ro_uri_supports_unc_and_non_ascii_paths(tmp_path):
+    """交付包放在網路磁碟或中文路徑下要開得起來（2026-08-28 實際踩到）。
+
+    UNC 直接接 file: 會被 sqlite 當成 authority 而拒絕；含中文與空白的路徑
+    要 percent-encode。這裡連 URI 字串與真的開檔一起驗。
+    """
+    import sqlite3                                       # noqa: PLC0415
+    sys.path.insert(0, os.path.join(ROOT, "local"))
+    from provider import sqlite_ro_uri                   # noqa: PLC0415
+
+    assert sqlite_ro_uri(r"\\oanas\資源分享\x\tax_index.sqlite").startswith("file:////oanas/")
+    assert sqlite_ro_uri(r"C:\data\tax_index.sqlite") == "file:C:/data/tax_index.sqlite?mode=ro"
+
+    d = tmp_path / "資源分享 To 某人"                      # 中文＋空白，比照交付路徑
+    d.mkdir()
+    db = str(d / "tax_index.sqlite")
+    con = sqlite3.connect(db)
+    con.execute("create table tax (tax_id TEXT PRIMARY KEY)")
+    con.commit()
+    con.close()
+    ro = sqlite3.connect(sqlite_ro_uri(db), uri=True)
+    assert ro.execute("select count(*) from tax").fetchone()[0] == 0
+    ro.close()

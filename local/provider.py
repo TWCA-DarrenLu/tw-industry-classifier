@@ -53,6 +53,21 @@ def parse_tax_row(row):
     return {"name": row[COL_NAME].strip(), "org": row[COL_ORG].strip(), "codes": codes}
 
 
+def sqlite_ro_uri(path):
+    r"""檔案路徑 → sqlite 唯讀 URI。放在網路磁碟或中文路徑下都要連得上。
+
+    兩個踩過的雷：
+      UNC 路徑（\\server\share\...）直接接在 file: 後面，sqlite 會把 server 當成
+      URI 的 authority 並拒絕（OperationalError: invalid uri authority）。UNC 要寫成
+      file:////server/share/...——前兩個斜線是空 authority，後兩個才是 UNC 本體。
+      路徑含中文或空白（交付包放在「\\oanas\資源分享\To 紹民\」下就同時中了兩樣）
+      一律 percent-encode，冒號與斜線保留原樣以維持 Windows 磁碟機代號寫法。
+    """
+    p = path.replace("\\", "/")
+    quoted = urllib.parse.quote(p, safe="/:")
+    return "%s%s?mode=ro" % ("file://" if p.startswith("//") else "file:", quoted)
+
+
 class LocalProvider(ProviderBase):
     mode_name = "本地端全檔"
 
@@ -69,7 +84,7 @@ class LocalProvider(ProviderBase):
         self.data_version = self._describe_versions()
         idx = self._path(TAX_INDEX)
         if os.path.exists(idx):
-            self._conn = sqlite3.connect("file:%s?mode=ro" % idx.replace("\\", "/"), uri=True)
+            self._conn = sqlite3.connect(sqlite_ro_uri(idx), uri=True)
 
     # ── 資料版本（寫進每筆輸出，供稽核）────────────────────────────────
     def _describe_versions(self):
