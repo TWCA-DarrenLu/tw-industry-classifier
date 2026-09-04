@@ -13,9 +13,13 @@ r"""產出「八欄版」產業分類對照表（xlsx）— 兩軌並列
 
 用法：
     py -3.12 emit_eight_column.py
-        讀 output/產業分類對照表_20260803.xlsx（取「統一編號」與「原始資料產業別」欄），
+        讀 output/產業分類對照表_20260803.xlsx
+        （取「統一編號」、名稱欄（見 NAME_HEADERS）與「原始資料產業別」欄），
         寫 output/產業分類對照表_<今日>_八欄版.xlsx
     py -3.12 emit_eight_column.py --in <輸入.xlsx> --out <輸出.xlsx>
+
+輸入檔的名稱欄是必填的：缺名稱會擋下來（理由見 classify.MISSING_NAME_WHY）。
+真的只想用統編查官方資料 → 加 --allow-missing-name。
 
 輸出兩個分頁：
     產業分類對照表  主表八欄，列序與輸入一致（可並排比對）
@@ -34,10 +38,12 @@ sys.path.insert(0, os.path.join(HERE, "core"))
 
 import engine                                        # noqa: E402
 import exceptions as X                               # noqa: E402
-from classify import build_provider                  # noqa: E402
+from classify import build_provider, require_names   # noqa: E402
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")     # 守門訊息走 sys.exit()（＝stderr）
 
 OUTPUT = os.path.join(HERE, "output")
 DEFAULT_IN = os.path.join(OUTPUT, "產業分類對照表_20260803.xlsx")
@@ -51,9 +57,9 @@ UNTRACKED_LABEL = "一般企業"
 UNTRACKED_BASIS = "名冊查無：金管會／機關／學校／非營利名冊皆未命中，且非稅籍特許碼"
 
 
-def eight_columns(provider, raw_tax_id, raw_industry=""):
-    """一筆輸入 → 八欄 list。"""
-    rec = engine.query(raw_tax_id, provider)
+def eight_columns(provider, raw_tax_id, raw_industry="", name=""):
+    """一筆輸入 → 八欄 list。name＝客戶名稱，官方名冊查無時當備用名。"""
+    rec = engine.query(raw_tax_id, provider, fallback_name=name)
     tid = rec["統一編號"]                             # 輸入原值（L1-1 不改寫輸出鍵）
     if rec["分類依據層"].startswith("L0"):            # L0 終結者沒有 8 碼統編，行業軌不適用
         section, major2 = "", ""
@@ -69,8 +75,14 @@ def eight_columns(provider, raw_tax_id, raw_industry=""):
     return [tid, rec["官方正式名稱"], group, sub, section, major2, basis, raw_industry]
 
 
+# 名稱欄的候選表頭，依優先序。「客戶名稱」是帳務端原生欄名；「官方正式名稱」讓
+# 上一版對照表可以直接當輸入回跑（round-trip）。名稱是判定執行業務者的唯一依據，
+# 所以這裡一定要讀，不能像舊版只取統編——理由見 classify.MISSING_NAME_WHY。
+NAME_HEADERS = ("客戶名稱", "名稱", "備用名稱", "官方正式名稱")
+
+
 def read_input(path):
-    """讀輸入 xlsx 第一個分頁 → [(統編, 原始資料產業別)]，維持列序。"""
+    """讀輸入 xlsx 第一個分頁 → [(統編, 原始資料產業別, 客戶名稱)]，維持列序。"""
     from openpyxl import load_workbook               # noqa: PLC0415
     wb = load_workbook(path, read_only=True, data_only=True)
     ws = wb.worksheets[0]
@@ -80,17 +92,25 @@ def read_input(path):
         sys.exit("輸入檔缺「統一編號」欄：%s" % path)
     i_tid = head.index("統一編號")
     i_raw = head.index("原始資料產業別") if "原始資料產業別" in head else None
+    i_name = next((head.index(h) for h in NAME_HEADERS if h in head), None)
+
+    def cell(row, idx):
+        if idx is None or len(row) <= idx or row[idx] is None:
+            return ""
+        return str(row[idx]).strip()
+
     out = []
     for row in rows:
-        tid = "" if row[i_tid] is None else str(row[i_tid]).strip()
+        tid = cell(row, i_tid)
         if not tid:
             continue
-        raw = ""
-        if i_raw is not None and len(row) > i_raw and row[i_raw] is not None:
-            raw = str(row[i_raw]).strip()
-        out.append((tid, raw))
+        out.append((tid, cell(row, i_raw), cell(row, i_name)))
     wb.close()
     return out
+
+
+NO_NAME_COLUMN_HINT = (
+    "  輸入檔找不到名稱欄——需要下列其中一欄：" + "／".join(NAME_HEADERS) + "。")
 
 
 def write_xlsx(path, main_rows, peri_rows):
@@ -126,18 +146,24 @@ def main():
                     help="輸出 xlsx（預設 output/產業分類對照表_<今日>_八欄版.xlsx）")
     ap.add_argument("--mode", choices=("auto", "local", "api"), default="local")
     ap.add_argument("--offline", action="store_true", help="不連外（GCIS 名稱解析會跳過）")
+    ap.add_argument("--allow-missing-name", action="store_true",
+                    help="允許缺名稱（預設擋下來）；加了之後名稱型規則對缺名稱的列不會生效")
     args = ap.parse_args()
 
     if not os.path.exists(args.src):
         sys.exit("找不到輸入檔：%s" % args.src)
     items = read_input(args.src)
+    if not items:
+        sys.exit("輸入檔沒有可判的資料列：%s" % args.src)
+    require_names([(t, n) for t, _, n in items],
+                  allow_missing=args.allow_missing_name, hint=NO_NAME_COLUMN_HINT)
     mode, provider = build_provider(args.mode, args.offline)
     print("模式 %s ｜ 輸入 %d 筆（%s）" % (mode, len(items), os.path.basename(args.src)))
     if mode == "local" and getattr(provider, "wants_preload", False):
         print("預載稅籍（掃一次全檔，約 20–40 秒）…")
-        provider.preload([engine.normalize_tax_id(t) for t, _ in items])
+        provider.preload([engine.normalize_tax_id(t) for t, _, _ in items])
 
-    main_rows = [eight_columns(provider, tid, raw) for tid, raw in items]
+    main_rows = [eight_columns(provider, tid, raw, name) for tid, raw, name in items]
 
     peri_rows = []
     for tid in sorted(X.PERIPHERAL):

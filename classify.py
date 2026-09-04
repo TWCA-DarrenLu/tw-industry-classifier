@@ -18,10 +18,12 @@ r"""產業分類查詢 — 統一入口（本地端與 API 端共用）
 ────
   # 單筆查詢（v5 起也吃 F 碼／P 碼與格式異常值，一律有明確輸出）
   py -3.12 classify.py 22099131
+  py -3.12 classify.py 12345678 --name 測試聯合會計師事務所   # 帶名稱才判得出執行業務者
   py -3.12 classify.py F000001
   py -3.12 classify.py --mode api 22099131
 
-  # 整批跑名單（CSV，第一欄統編；有表頭會自動略過）
+  # 整批跑名單（CSV 兩欄：第一欄統編、第二欄客戶名稱；有表頭會自動略過）
+  # 名稱是必填的——缺名稱會擋下來不讓它安靜跑完，理由見 require_names()
   # 統編欄留空但第二欄有名稱的列會保留，走無統編歸戶表（L0-N）
   py -3.12 classify.py --input input/taxids.csv --output output/result.csv
 
@@ -48,6 +50,10 @@ import exceptions as X                               # noqa: E402
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    # 守門訊息走 sys.exit()（＝stderr）。不設這行，Windows 預設 cp950，
+    # 錯誤訊息重導向到檔案或 CI log 就是亂碼。
+    sys.stderr.reconfigure(encoding="utf-8")
 
 DATA = os.path.join(HERE, "data")
 OUTPUT = os.path.join(HERE, "output")
@@ -96,6 +102,44 @@ def read_taxids(path):
                 continue                              # 表頭
             out.append((first, name))
     return out
+
+
+MISSING_NAME_SAMPLES = 10
+
+MISSING_NAME_WHY = (
+    "  沒有名稱時，L3-A 制度性名稱與 L3-C 名稱關鍵字兩層會整層空轉——這兩層吃的是\n"
+    "  同一個名稱變數。執行業務者（會計師／律師／專利商標事務所）依法不辦營業登記，\n"
+    "  稅籍與商工登記本來就查無，名稱是它們唯一的判定依據；沒名稱就一路掉到 L4 兜底，\n"
+    "  輸出「未登記（稅籍查無）」＋子分類「未細分」＋信心 low，與「這家真的查無」\n"
+    "  長得完全一樣，沒有人看得出來出錯了。\n"
+    "  實測一批事務所類名單：只給統編有 97.3% 落 L4 兜底、判出執行業務者不到 0.4%；\n"
+    "  同一批帶名稱則 97.5% 判出執行業務者。\n"
+    "  確實只想用統編查官方資料（不需要名稱型規則）→ 加 --allow-missing-name。")
+
+
+def require_names(pairs, allow_missing=False, hint=""):
+    """名稱必填守門。回傳缺名稱的筆數；allow_missing=False 時缺名稱直接中止。
+
+    擋在這裡而不是引擎裡：引擎對「名稱為空」的處理是正確的（沒東西可比就不命中），
+    問題出在呼叫端沒把名稱帶進來，而且失敗是靜默的。理由詳見 MISSING_NAME_WHY。
+    """
+    pairs = list(pairs)
+    missing = [t or "(統編空白)" for t, n in pairs if not (n or "").strip()]
+    if not missing:
+        return 0
+    shown = "、".join(missing[:MISSING_NAME_SAMPLES])
+    if len(missing) > MISSING_NAME_SAMPLES:
+        shown += " …等 %d 筆" % len(missing)
+    lines = ["名稱必填：輸入 %d 筆，其中 %d 筆沒有名稱（%s）。"
+             % (len(pairs), len(missing), shown)]
+    if len(missing) == len(pairs) and hint:
+        lines.append(hint)
+    lines.append(MISSING_NAME_WHY)
+    if not allow_missing:
+        sys.exit("\n".join(lines))
+    print("警語：%d／%d 筆缺名稱，已依 --allow-missing-name 繼續執行；"
+          "這些列的名稱型規則（L3-A／L3-C）不會生效。" % (len(missing), len(pairs)))
+    return len(missing)
 
 
 def doctor():
@@ -159,7 +203,13 @@ def main():
     ap.add_argument("tax_id", nargs="?", help="要查的統一編號（單筆查詢）")
     ap.add_argument("--mode", choices=("auto", "local", "api"), default="auto",
                     help="查詢模式（預設 auto：資料齊全走 local，否則走 api）")
-    ap.add_argument("--input", help="統編清單 CSV（第一欄統編，可選第二欄備用名稱）")
+    ap.add_argument("--name", default="",
+                    help="單筆查詢的客戶名稱（官方名冊查無時當備用名；"
+                         "執行業務者這類無稅籍主體只有靠它才判得出來）")
+    ap.add_argument("--input", help="統編清單 CSV（第一欄統編、第二欄客戶名稱，名稱必填）")
+    ap.add_argument("--allow-missing-name", action="store_true",
+                    help="允許缺名稱（預設擋下來）。只用統編查官方資料時才加，"
+                         "加了之後名稱型規則對缺名稱的列不會生效")
     ap.add_argument("--output", help="輸出 CSV 路徑（預設 output/分類結果.csv）")
     ap.add_argument("--offline", action="store_true", help="不連外，跳過 GCIS 那層")
     ap.add_argument("--tolerate-api-error", action="store_true",
@@ -181,7 +231,13 @@ def main():
 
     # ── 單筆 ─────────────────────────────────────────────────────────────
     if args.tax_id:
-        rec = engine.query(args.tax_id, provider, as_of=args.as_of)
+        # 單筆是互動診斷用途，輸出整份都看得到（名稱來源欄會寫「查無官方名稱」），
+        # 所以缺名稱只警告不中止；批次是交付產線，缺名稱一律擋下（見 require_names）。
+        if not args.name.strip():
+            print("警語：未帶 --name，名稱型規則（L3-A／L3-C）不會生效。"
+                  "事務所、醫院、學校這類主體請補 --name <客戶名稱> 再查。")
+        rec = engine.query(args.tax_id, provider, fallback_name=args.name.strip(),
+                           as_of=args.as_of)
         if hasattr(provider, "save_gcis_cache"):
             provider.save_gcis_cache()
         shown = engine.display(rec)
@@ -200,6 +256,10 @@ def main():
 
     # ── 批次 ─────────────────────────────────────────────────────────────
     items = read_taxids(args.input)
+    if not items:
+        sys.exit("輸入檔沒有可判的資料列：%s" % args.input)
+    require_names(items, allow_missing=args.allow_missing_name,
+                  hint="  看起來輸入檔只有統編一欄——需要「第一欄統編、第二欄客戶名稱」兩欄。")
     summary = "、".join(
         "%s %s" % (k, f"{v:,}" if isinstance(v, int) else v)
         for k, v in provider.registry_summary().items())

@@ -17,9 +17,13 @@ r"""產出「單軌版」產業分類對照表（xlsx）— 每戶只有一組 �
 
 用法：
     py -3.12 emit_single_track.py
-        讀 output/產業分類對照表_20260803.xlsx（取「統一編號」與「原始資料產業別」欄），
+        讀 output/產業分類對照表_20260803.xlsx
+        （取「統一編號」、名稱欄（見 emit_eight_column.NAME_HEADERS）與「原始資料產業別」欄），
         寫 output/產業分類對照表_<今日>_單軌版.xlsx
     py -3.12 emit_single_track.py --in <輸入.xlsx> --out <輸出.xlsx>
+
+輸入檔的名稱欄是必填的：缺名稱會擋下來（理由見 classify.MISSING_NAME_WHY）。
+真的只想用統編查官方資料 → 加 --allow-missing-name。
 
 輸出兩個分頁：
     產業分類對照表  主表六欄，列序與輸入一致（可並排比對）
@@ -39,11 +43,13 @@ sys.path.insert(0, os.path.join(HERE, "core"))
 import engine                                        # noqa: E402
 import rules as R                                    # noqa: E402
 import exceptions as X                               # noqa: E402
-from classify import build_provider                  # noqa: E402
-from emit_eight_column import read_input             # noqa: E402
+from classify import build_provider, require_names   # noqa: E402
+from emit_eight_column import NO_NAME_COLUMN_HINT, read_input   # noqa: E402
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")     # 守門訊息走 sys.exit()（＝stderr）
 
 OUTPUT = os.path.join(HERE, "output")
 DEFAULT_IN = os.path.join(OUTPUT, "產業分類對照表_20260803.xlsx")
@@ -56,9 +62,9 @@ HEADERS = ["統一編號", "官方正式名稱", "產業大類", "產業子類",
 TAX_MISSING_BASIS = "名冊查無執照且稅籍查無"
 
 
-def six_columns(provider, raw_tax_id, raw_industry=""):
-    """一筆輸入 → 六欄 list。"""
-    rec = engine.query(raw_tax_id, provider)
+def six_columns(provider, raw_tax_id, raw_industry="", name=""):
+    """一筆輸入 → 六欄 list。name＝客戶名稱，官方名冊查無時當備用名。"""
+    rec = engine.query(raw_tax_id, provider, fallback_name=name)
     basis = rec["分類依據詞"].rstrip()               # 引擎對超長裁決理由截斷，去尾端空白
     if (rec["大分類"] == "一般企業"
             and rec["產業大類"] == R.TAX_MISSING_SECTION
@@ -101,18 +107,24 @@ def main():
                     help="輸出 xlsx（預設 output/產業分類對照表_<今日>_單軌版.xlsx）")
     ap.add_argument("--mode", choices=("auto", "local", "api"), default="local")
     ap.add_argument("--offline", action="store_true", help="不連外（GCIS 名稱解析會跳過）")
+    ap.add_argument("--allow-missing-name", action="store_true",
+                    help="允許缺名稱（預設擋下來）；加了之後名稱型規則對缺名稱的列不會生效")
     args = ap.parse_args()
 
     if not os.path.exists(args.src):
         sys.exit("找不到輸入檔：%s" % args.src)
     items = read_input(args.src)
+    if not items:
+        sys.exit("輸入檔沒有可判的資料列：%s" % args.src)
+    require_names([(t, n) for t, _, n in items],
+                  allow_missing=args.allow_missing_name, hint=NO_NAME_COLUMN_HINT)
     mode, provider = build_provider(args.mode, args.offline)
     print("模式 %s ｜ 輸入 %d 筆（%s）" % (mode, len(items), os.path.basename(args.src)))
     if mode == "local" and getattr(provider, "wants_preload", False):
         print("預載稅籍（掃一次全檔，約 20–40 秒）…")
-        provider.preload([engine.normalize_tax_id(t) for t, _ in items])
+        provider.preload([engine.normalize_tax_id(t) for t, _, _ in items])
 
-    main_rows = [six_columns(provider, tid, raw) for tid, raw in items]
+    main_rows = [six_columns(provider, tid, raw, name) for tid, raw, name in items]
 
     peri_rows = []
     for tid in sorted(X.PERIPHERAL):

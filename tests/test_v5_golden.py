@@ -919,6 +919,71 @@ def test_batch_reader_keeps_nameless_taxid_rows(tmp_path):
     assert got == [("22099131", "台積電"), ("", "某某無統編單位"), ("F000001", "某境外法人")], got
 
 
+# ── 名稱必填守門（2026-09-04）────────────────────────────────────────────
+# 這一組守的是一個「靜默失敗」：缺名稱時 L3-A／L3-C 整層空轉，輸出的
+# 「未登記（稅籍查無）」＋「未細分」＋low 與「真的查無」無法區分，
+# 實務上整批交付出去才被發現。改動見 classify.require_names()。
+
+def test_require_names_passes_when_all_named():
+    from classify import require_names                  # noqa: PLC0415
+    assert require_names([("22099131", "台積電"), ("", "某某無統編單位")]) == 0
+
+
+def test_require_names_aborts_on_missing_name():
+    import pytest                                       # noqa: PLC0415
+    from classify import require_names                  # noqa: PLC0415
+    with pytest.raises(SystemExit) as e:
+        require_names([("22099131", "台積電"), ("12345678", "")])
+    msg = str(e.value)
+    assert "名稱必填" in msg and "12345678" in msg, msg
+
+
+def test_require_names_treats_whitespace_as_missing():
+    import pytest                                       # noqa: PLC0415
+    from classify import require_names                  # noqa: PLC0415
+    with pytest.raises(SystemExit):
+        require_names([("12345678", "   ")])
+
+
+def test_require_names_allow_missing_escape_hatch(capsys):
+    from classify import require_names                  # noqa: PLC0415
+    n = require_names([("22099131", "台積電"), ("12345678", "")], allow_missing=True)
+    assert n == 1
+    assert "--allow-missing-name" in capsys.readouterr().out
+
+
+def test_emit_read_input_reads_name_column(tmp_path):
+    """emit_* 的輸入解析必須讀名稱欄——舊版只取統編，事務所會整批落一般企業。"""
+    import pytest                                       # noqa: PLC0415
+    openpyxl = pytest.importorskip("openpyxl")
+    from emit_eight_column import read_input            # noqa: PLC0415
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(["統一編號", "客戶名稱", "原始資料產業別"])
+    ws.append(["12345678", "測試聯合會計師事務所", ""])
+    ws.append(["22099131", "台灣積體電路製造股份有限公司", "製造"])
+    p = tmp_path / "in.xlsx"
+    wb.save(str(p))
+    assert read_input(str(p)) == [
+        ("12345678", "", "測試聯合會計師事務所"),
+        ("22099131", "製造", "台灣積體電路製造股份有限公司"),
+    ]
+
+
+def test_emit_read_input_name_column_falls_back_to_official_name(tmp_path):
+    """舊版對照表沒有「客戶名稱」欄，要能拿「官方正式名稱」回跑。"""
+    import pytest                                       # noqa: PLC0415
+    openpyxl = pytest.importorskip("openpyxl")
+    from emit_eight_column import read_input            # noqa: PLC0415
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(["統一編號", "官方正式名稱", "原始資料產業別"])
+    ws.append(["12345678", "測試聯合會計師事務所", ""])
+    p = tmp_path / "in.xlsx"
+    wb.save(str(p))
+    assert read_input(str(p)) == [("12345678", "", "測試聯合會計師事務所")]
+
+
 # ══════════════════════════════════════════════════════════════════════════
 # 真資料個案（缺 data/ 時跳過）
 # ══════════════════════════════════════════════════════════════════════════
