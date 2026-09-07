@@ -286,10 +286,7 @@ py -3.12 emit_single_track.py --in <輸入.xlsx> --out <輸出.xlsx>
 
 ## 驗收
 
-```bash
-py -3.12 -m pytest tests/          # 規則與值域（43 項，不需外網）
-py -3.12 tests/test_consistency.py # 重現性與兩模式一致性
-```
+本節說明**這個工具憑什麼可信**；實際要跑的指令與改完之後的閘門紀律見 [`AGENTS.md`](AGENTS.md)。
 
 `test_consistency.py` 跑五項檢查，全部通過才算可交付：
 
@@ -361,48 +358,13 @@ py -3.12 make_handover.py --no-crawlers   # 只要查詢功能，不含名冊維
 
 ## 要改規則的時候
 
-規則分兩層，改的地方不同。
+規則分兩層：**通用規則**在 `core/rules.py`（純資料，零 import、零路徑），
+**存量裁決紀錄**在 `exceptions/local_exceptions.json`（格式見 [`exceptions/README.md`](exceptions/README.md)）。
 
-### 通用規則 → `core/rules.py`
+改規則的完整紀律——哪一種規則改哪個常數、為什麼改名稱規則前一定要先實掃母體、
+改完必跑哪三道驗收——**唯一來源是 [`AGENTS.md`](AGENTS.md)**，人類貢獻者與 AI 代理共用同一份。
 
-純資料（零 import、零路徑），任何人都適用的部分：
-
-- 稅籍分類改版了 → 改 `SUB_BY_MAJOR2` 與 `MAJOR2_LABEL`
-- 要加子分類 → 先加進 `SUBGROUPS` 值域，否則值域自我檢查會擋下來
-- 制度性名稱規則 → `INSTITUTIONAL_RULES`（順序即優先序），
-  防呆清單在 `CORP_SUFFIX_EXCLUDE`、`CORP_SUFFIX_GUARD_RULES`、`INSTITUTIONAL_KEYWORD_EXCLUDE`
-- 一般名稱關鍵字 → `NAME_RULES`（順序即優先序），尾綴排除在 `NAME_RULE_SUFFIX_EXCLUDE`
-- 統編前綴 → `UID_PREFIX`
-
-**改名稱規則前請先實掃母體**：`core/engine.py` 的 `_match_institutional()` 可以直接拿去
-掃稅籍全檔，數出一條規則會命中幾筆、命中的是什麼。v5 的四道防呆全部是這樣掃出來的
-——用想的會漏掉「動物醫院」「大學城自助餐」這種。
-
-### 存量裁決紀錄 → `exceptions/local_exceptions.json`
-
-先講清楚定位：**分類 pipeline 對未來的新客戶不依賴人工裁決**。丟一個沒看過的統編進來，
-答案由官方名冊、稅籍碼與名稱規則決定；例外表是空的也照樣跑，不會少一塊。
-
-這個檔記的是**回溯既有名單時留下的一次性裁決紀錄**——整理存量資料時遇到的帳務佔位碼、
-已解散但仍在名單裡的舊戶、官方名冊分類與自身業務口徑不同的個案，當時查證的結論記在這裡，
-下次重跑同一批名單不用重查。六張表：統編修正、追加周邊單位、已裁決例外、凍結名稱、
-凍結登記狀態、無統編歸戶。格式見 [`exceptions/README.md`](exceptions/README.md)。
-
-它隨存量名單長，不隨新客戶長。**空的例外表不是待辦事項。**
-
-**為什麼分開放**：這類裁決的理由通常涉及業務往來關係或對特定機構的內部研究。
-混在通用規則裡會讓規則檔看起來像一份客戶清單，而且換一個組織使用時本來就該重新檢視，
-不該照抄別人的裁決。
-
-### 改完之後
-
-```bash
-py -3.12 -m pytest tests/              # 規則與值域
-py -3.12 tests/test_consistency.py     # 重現性
-py -3.12 core/emit_rule_table.py       # 讓 docs/分類邏輯表 跟著更新
-```
-
-規則表與文件是同一份來源生成的，不會出現「文件寫的跟程式跑的不一樣」。
+本 README 負責產品說明與使用方式，**不重複 `AGENTS.md` 的內容**，以免兩份文件各說各話。
 
 ---
 

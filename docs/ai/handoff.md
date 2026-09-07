@@ -1,41 +1,47 @@
 # 工作交接
 
-- **任務**：導入 Claude／Codex 共用文件結構（`AGENTS.md` ＋ `docs/ai/`），比照 TWCA_DA 2026-09-07 的做法。
+- **任務**：導入 Claude／Codex 共用文件結構，並確立 `AGENTS.md` 與 `README.md` 的所有權切分。
 - **更新時間／交出者**：2026-09-07／Claude（Opus 5）
-- **Branch／HEAD**：`docs/cross-agent-setup`，自 `main` 開出（開分支時 `main` 與 `origin/main` 同步、工作樹乾淨）。接手時請 `git log --oneline -3` 核對。
+- **Branch／HEAD**：`main`（`docs/agents-as-source` 已併入並刪除）。接手時請 `git log --oneline -3` 核對。
 
-## 已完成／修改路徑
+## 現行文件所有權（本次確立，動文件前先看這條）
 
-| 檔案 | 變更 |
+| 檔案 | 擁有什麼 |
 |---|---|
-| `AGENTS.md` | **新增**。安裝器 managed 區塊 ＋ **指路型**代理工作規則（規則兩層、實掃母體、驗收閘門、環境、資料邊界） |
-| `CLAUDE.md` | **新增**。原本不存在；僅含 `@AGENTS.md` managed 區塊 |
-| `docs/ai/memory.md` | **新增**。目前兩條：下游消費者 TWCA_DA 的值域影響史、`py -3.12` 環境事實 |
-| `docs/ai/handoff.md` | **新增**（本檔） |
+| `AGENTS.md` | **規則與紀律的唯一來源**：改哪個常數、改之前要做什麼、改完要跑什麼、哪些事不准做。人類貢獻者與 AI 代理共用 |
+| `README.md` | **產品說明與使用方式的唯一來源**：這是什麼、怎麼查、值域、判定流程、資料來源、已知限制、執行環境 |
+| `core/rules.py`、`docs/分類邏輯表.md` | **執行真相**。文件與程式不一致時以程式為準，回頭修文件 |
+
+**兩份文件不互相複製**，需要對方內容時放連結。這是刻意的設計，不要「順手補回去」。
+
+## 已完成
+
+**第一階段（commit `6225efa`）**：安裝器建骨架 → `AGENTS.md`、`CLAUDE.md`（原本不存在）、`docs/ai/memory.md`、`docs/ai/handoff.md`。
+
+**第二階段（本次）**：把 `AGENTS.md` 從「README 的改寫副本」改為**本文**——
+
+- `README.md` §要改規則的時候（44 行）→ 縮為 7 行指標，紀律本文移入 `AGENTS.md`
+- `README.md` §驗收 → 保留「五項檢查是什麼、為什麼可信」，指令段改為指向 `AGENTS.md`
+- `AGENTS.md` → 新增所有權切分聲明；規則兩層、實掃母體、驗收閘門、資料邊界成為本文（85 行）
 
 **未動任何程式碼、測試或資料。**
-
-## 與 TWCA_DA 做法的差異（重要）
-
-TWCA_DA 是把既有 430 行 `CLAUDE.md` **逐字節搬進** `AGENTS.md`。本專案**不能照抄那個做法**，因為：
-
-- 本專案原本**沒有 `CLAUDE.md`**，沒有東西可搬
-- 知識已在 `README.md`（485 行）與 `docs/` 五份文件，且 `docs/分類邏輯表.md` 是**由 `core/emit_rule_table.py` 生成**的——複製一份進 `AGENTS.md` 會立刻產生第二個真相來源，違反本專案「規則表與文件同源」的設計
-
-因此 `AGENTS.md` 寫成**指路文件**：只放「代理動手前不知道就會做錯」的規則與去哪讀，規格本文一律指回 `README.md` 與 `docs/`。
 
 ## 驗證與有效方法
 
 - **`@AGENTS.md` 實際載入（已通過）**：於本目錄開新 session 提問，三題皆答對——加子分類要先進 `SUBGROUPS`、`_match_institutional()` 實掃母體、`py -3.12`。
-- **中文編碼（已通過）**：三個新檔皆回讀確認無亂碼。
+- **無殘留重複（已通過）**：`_match_institutional`／`SUB_BY_MAJOR2`／`NAME_RULE_SUFFIX_EXCLUDE`／「空的例外表」在 `README.md` 的出現次數皆為 0。`emit_rule_table` 尚有 2 處，經確認為目錄結構列表與「想看規則明細就跑這個」的使用說明，用途與紀律不同，刻意保留。
 - 未動程式碼，故未跑 `pytest`／`test_consistency.py`。
+
+## 無效方法／原因
+
+- **一度打算加一支 `tests/test_agents_doc.py` 斷言 README 的識別符仍存在，用來防止兩份文件漂移。使用者否決，理由正確**：那是在監控重複，而重複本身才是病灶。移除重複之後不需要那支測試，也就不必維護它。
+- **讀 README 時人在 `feat/require-customer-name`、卻把成果 commit 到 `main`**。事後 diff 確認兩個 branch 的 §要改規則的時候／§驗收／§執行環境注意 逐字節相同，本次無影響；但這是運氣不是流程。**跨 branch 引用內容前先確認自己在哪條 branch。**
 
 ## 未完成／下一步
 
-1. `AGENTS.md` 的內容源自 `README.md`（2026-09-07 當時版本）。**README 若大改，本檔要跟著核對**——目前沒有自動檢查機制防止兩者漂移，這是已知弱點。
-2. 本分支尚未 merge 回 `main`、尚未 push（交接當下狀態；實際以 `git log` 為準）。
-3. 其餘 Lab 專案尚未導入。已完成：TWCA_DA、industry_classifier。
+- `feat/require-customer-name`（`fac71b2` 名稱改為必填）仍未併入 `main`。**該 commit 改的是 README §快速開始的輸入格式說明（名稱必填、`--allow-missing-name`）**，併入後不影響 `AGENTS.md`，但併入時順手確認一次。
+- 其餘 Lab 專案尚未導入。已完成：TWCA_DA、industry_classifier。
 
 ## 待決事項
 
-- `feat/require-customer-name` 有一筆未併入 `main` 的 commit（`fac71b2` 名稱改為必填），非本次任務範圍，未處理。
+- 本地分支 `v5-pipeline`（`9b58643`）已完全併入 `main`，是更早留下的殘留，未清理。
