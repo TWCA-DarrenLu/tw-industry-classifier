@@ -40,9 +40,16 @@
 
 ## 未完成／下一步
 
-- `feat/require-customer-name` **已於 2026-09-07 併回 `main`**（rebase 後 fast-forward，維持線性歷史；原 `fac71b2` → `f7a1359`）。⚠️ **`origin/feat/require-customer-name` 仍指向 rebase 前的舊 SHA `fac71b2`，是孤立的殘留**，待清理。
 - 其餘 Lab 專案尚未導入。已完成：TWCA_DA、industry_classifier。
+
+## 分支現況（2026-09-07 清理後）
+
+`main` 是唯一分支，本地與 `origin` 皆然。
+
+- `feat/require-customer-name` 已 rebase 後 fast-forward 併回 `main`（原 `fac71b2` → `f7a1359`），本地與遠端分支皆已刪除。
+  刪除前已驗證兩個 SHA 的 patch **實際增刪行 md5 相同**（唯一差異是 blob index 行，因 README 基底變動必然不同），無內容遺失。
+- `v5-pipeline`（`9b58643`）早已完全併入 `main`，本地分支已刪除（遠端本就沒有）。
 
 ## 待決事項
 
-- 本地分支 `v5-pipeline`（`9b58643`）已完全併入 `main`，是更早留下的殘留，未清理。
+- 目前無。
