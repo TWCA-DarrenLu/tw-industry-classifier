@@ -30,7 +30,8 @@
 
 - **`@AGENTS.md` 實際載入（已通過）**：於本目錄開新 session 提問，三題皆答對——加子分類要先進 `SUBGROUPS`、`_match_institutional()` 實掃母體、`py -3.12`。
 - **無殘留重複（已通過）**：`_match_institutional`／`SUB_BY_MAJOR2`／`NAME_RULE_SUFFIX_EXCLUDE`／「空的例外表」在 `README.md` 的出現次數皆為 0。`emit_rule_table` 尚有 2 處，經確認為目錄結構列表與「想看規則明細就跑這個」的使用說明，用途與紀律不同，刻意保留。
-- 未動程式碼，故未跑 `pytest`／`test_consistency.py`。
+- **併入 `feat/require-customer-name` 後的閘門（已通過）**：`py -3.12 -m pytest tests/` → **74 passed**；`py -3.12 tests/test_consistency.py` → 重現性三次同 SHA、順序無關、值域越界 0 筆、兩模式 15 筆逐欄相同，**全部通過**（含需連外的第四項）。`core/` 零變更故未重生 `docs/分類邏輯表`。
+- **文件計數漂移實例（已修）**：`AGENTS.md` 原寫「43 項」，實跑為 74。已改為不寫數量——寫死的計數必然再次過期，這種事實應該由測試輸出說，不由文件說。
 
 ## 無效方法／原因
 
@@ -39,7 +40,7 @@
 
 ## 未完成／下一步
 
-- `feat/require-customer-name`（`fac71b2` 名稱改為必填）仍未併入 `main`。**該 commit 改的是 README §快速開始的輸入格式說明（名稱必填、`--allow-missing-name`）**，併入後不影響 `AGENTS.md`，但併入時順手確認一次。
+- `feat/require-customer-name` **已於 2026-09-07 併回 `main`**（rebase 後 fast-forward，維持線性歷史；原 `fac71b2` → `f7a1359`）。⚠️ **`origin/feat/require-customer-name` 仍指向 rebase 前的舊 SHA `fac71b2`，是孤立的殘留**，待清理。
 - 其餘 Lab 專案尚未導入。已完成：TWCA_DA、industry_classifier。
 
 ## 待決事項

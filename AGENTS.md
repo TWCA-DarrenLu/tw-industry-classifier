@@ -69,7 +69,7 @@
 ## 驗收閘門（改完必跑）
 
 ```bash
-py -3.12 -m pytest tests/          # 規則與值域（43 項，不需外網）
+py -3.12 -m pytest tests/          # 規則與值域（不需外網）
 py -3.12 tests/test_consistency.py # 重現性與兩模式一致性（五項全過才算可交付）
 py -3.12 core/emit_rule_table.py   # 改過規則就要重生 docs/分類邏輯表
 ```
