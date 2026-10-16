@@ -2,8 +2,9 @@
 
 - **任務**：資料快照更新至 2026-10 版（2026-10-16 實抓）＋本季金管會名冊人工歸併。
 - **更新時間／交出者**：2026-10-16／Claude（Opus 5.5）
-- **Branch／HEAD**：`main`，HEAD `39579d1`；本次修改**尚未 commit**。接手時請 `git status` 核對。
+- **Branch／HEAD**：`main`；資料與名冊歸併於 `9e30851` 提交並推上 GitHub。接手時請 `git log --oneline -3` 核對。
 - `crawlers/fetch_insurance.py` 的保經 PDF 連結由另一個 session 修正（改為保險局「保險輔助人」頁 1150827 版），本 session 重跑驗收後一併提交。
+- **本任務已結案**：GitHub 已推、OANAS 團隊交付包已更新並經 MD5＋獨立讀回驗收、備份已依使用者指示刪除。
 
 ## 現行文件所有權（2026-09-07 確立，動文件前先看這條）
 
@@ -64,16 +65,14 @@
   重跑 `fetch_insurance.py`（不加 `--skip-broker-pdf`）回傳碼 0、解析 48 列；報告的 +3／−3 只是「(原：…)」
   註記的全半形冒號差異，晶華、雄獅國際、香港商安宏三家現名皆已在冊，無需歸併。人身／產險／再保無異動。
 
-## 備份（皆 gitignored）
+## 備份
 
-- `data/_snapshot_20260730/`：7 月版五個公開檔＋上市櫃兩檔＋舊 `authority_master.csv`（`_fetch_log.json` 是 10-16 `--check` 寫過的版本）
-- `crawlers/masters/_backup_20261016/`、`crawlers/build/_backup_20261016/`：歸併前的列源名冊與 build
+7 月版資料快照、歸併前的列源名冊與 build、OANAS 舊包，皆已於 2026-10-16 依使用者指示刪除。
+要回溯歸併前的名冊內容，只能從 `notes`／`aliases` 欄的更名紀錄反推（舊名都留在 aliases）。
 
 ## 未完成／下一步
 
-1. 本次修改 commit 並推 GitHub。
-2. 更新 OANAS 團隊交付包（位置與排除清單見本機 Claude 記憶，不寫進公開 repo）。
-3. 確認無需回溯後刪除上列三個備份夾。
+- 無。下一季（約 2027-01）照 `docs/名冊維護與爬蟲.md` 再跑一輪；OANAS 交付包的更新流程見本機 Claude 記憶（不寫進公開 repo）。
 
 ## 待決事項
 
