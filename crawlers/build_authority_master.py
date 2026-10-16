@@ -113,7 +113,7 @@ MASTER_PATHS = {
 # 硬編的預期列數是**刻意的防呆**：列源名冊是凍結事實，列數變動代表名冊被改動過，
 # 而非本腳本邏輯改變。若確認是刻意更新名冊，才連帶調整這裡的數字。
 SOURCE_INPUTS = [
-    ("financial_institutions_master.csv", 490),
+    ("financial_institutions_master.csv", 494),  # 2026-10-16 季度歸併：+4 第三方支付（數位部能量登錄 1150923 版）
     ("insurance_brokers_master.csv", 542),  # 542（非 544）：台新證保代／未來保代更名後的新舊名重複列已合併
     ("farmers_credit_master.csv", 311),
 ]

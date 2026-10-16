@@ -7,7 +7,7 @@
 
 | 檔案 | 列數 | 內容 |
 |---|---|---|
-| `financial_institutions_master.csv` | 490 | 銀行、證券、期貨、投信、投顧、保險本業、電支等 20 個 segment |
+| `financial_institutions_master.csv` | 494 | 銀行、證券、期貨、投信、投顧、保險本業、電支等 20 個 segment |
 | `insurance_brokers_master.csv` | 542 | 保險經紀人公司＋保險代理人公司 |
 | `farmers_credit_master.csv` | 311 | 農會信用部 283＋漁會信用部 28 |
 | `tax_id_lookup.csv` | 1,344 | 機構全銜 → 統編的解析快取 |
@@ -40,6 +40,6 @@ tax_id, tax_id_source, status, notes
 > ⚠️ **不要直接執行 `enrich_tax_id.py` 的 main()**。它會用三張列源名冊從零重建
 > `tax_id_lookup.csv`，覆蓋掉既有的 GCIS 查詢成果。該檔已加旗標保護，但還是別碰。
 
-> ⚠️ **builder 有列數守門**：`SOURCE_INPUTS` 硬編期望列數（490／542／311），
+> ⚠️ **builder 有列數守門**：`SOURCE_INPUTS` 硬編期望列數（494／542／311），
 > 你更新名冊後列數會變，builder 會停下來報錯。這是刻意的防呆——確認是刻意更新後
 > 再改那個常數。

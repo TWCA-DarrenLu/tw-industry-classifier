@@ -37,8 +37,10 @@
 - 前 4 個名冊皆不含統編（`inst_code` 僅保經代的公會會員代碼），需另行補全。
 
 【脆弱點警示】保險局那份 PDF 是**寫死的下載連結**（`BROKER_PDF_URL` 內含官方檔名
-`business/202605271743300.pdf` 與日期字串 1150527）。官方換檔／改版即失效，屆時會出現
+`business/202608281347540.pdf` 與日期字串 1150827）。官方換檔／改版即失效，屆時會出現
 404 或解析 0 列，需人工到保險局網站找新連結並更新 `BROKER_PDF_URL`。
+新連結在保險局官網「業務主題專區 → 保險輔助人」頁（https://www.ib.gov.tw/ch/home.jsp?id=60&parentpath=0,8）
+的《得於我國經營再保險經紀業務之保險經紀人公司一覽表》項目（2026-10-16 實測）。
 不想被這一項拖慢執行時可加 `--skip-broker-pdf` 略過。
 
 執行方式：
@@ -95,8 +97,8 @@ AGENT_DATASETS = [
 
 # 【脆弱點】官方寫死檔名的下載連結，官方換檔即失效，見檔頭警示
 BROKER_PDF_URL = (
-    "https://www.ib.gov.tw/uploaddowndoc?file=business/202605271743300.pdf"
-    "&filedisplay=%E5%86%8D%E4%BF%9D%E7%B6%93%E5%85%AC%E5%8F%B8%E4%B8%80%E8%A6%BD%E8%A1%A8-1150527.pdf"
+    "https://www.ib.gov.tw/uploaddowndoc?file=business/202608281347540.pdf"
+    "&filedisplay=%E5%86%8D%E4%BF%9D%E7%B6%93%E5%85%AC%E5%8F%B8%E4%B8%80%E8%A6%BD%E8%A1%A8-1150827.pdf"
     "&flag=doc"
 )
 BROKER_SEGMENT = "insurance_broker_reinsurance_permitted_subset"
